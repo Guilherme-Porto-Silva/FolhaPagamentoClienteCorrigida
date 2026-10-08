@@ -7,7 +7,7 @@ public class Conexao {
 
     public Connection link;
 
-    public void conectar () {
+    public Conexao () {
 
         String forName = "com.mysql.cj.jdbc.Driver";
         

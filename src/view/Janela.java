@@ -11,11 +11,9 @@ import java.util.List;
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 
-public class ClienteJanela extends JFrame {
+public class Janela extends JFrame {
 
-    
-
-    private Cliente SERVICO_CLIENTE = new Cliente();
+    private final Cliente SERVICO_CLIENTE;
 
 
 
@@ -53,22 +51,6 @@ public class ClienteJanela extends JFrame {
 
 
 
-    /*private void conectarRMI () {
-
-        try {
-            SERVICO_CLIENTE.conectarRMI();
-
-            System.out.println("\nRMI conectado.");
-        }
-
-        catch (Exception e) {
-
-            JOptionPane.showMessageDialog(this, "Erro ao conectar ao Servidor RMI: " + e.getMessage(), "Erro", JOptionPane.ERROR_MESSAGE);
-        }
-    }*/
-
-
-
     private JTabbedPane abas () {
 
         JTabbedPane retorno = new JTabbedPane();
@@ -84,21 +66,6 @@ public class ClienteJanela extends JFrame {
         System.out.println("\nAbas do painel criadas.");
 
         return retorno;
-    }
-
-
-
-    public ClienteJanela () throws RemoteException {   
-
-        setTitle("Sistema de Folha de Pagamento - Grupo 1");
-
-        setSize(700, 500);
-
-        setDefaultCloseOperation(EXIT_ON_CLOSE);
-
-        setLocationRelativeTo(null);
-
-        add(abas());
     }
 
 
@@ -475,19 +442,34 @@ public class ClienteJanela extends JFrame {
 
 
 
+    public Janela () throws RemoteException {
+
+        SERVICO_CLIENTE = new Cliente();
+
+        setTitle("Sistema de Folha de Pagamento - Grupo 1");
+
+        setSize(700, 500);
+
+        setDefaultCloseOperation(EXIT_ON_CLOSE);
+
+        setLocationRelativeTo(null);
+
+        add(abas());
+    }
+
+
+
     // --- COLOCAR A TELA NA TELA --- //
 
     public static void main (String[] args) {
 
         SwingUtilities.invokeLater(() -> {
 
-            try { new ClienteJanela().setVisible(true); }
+            try { new Janela().setVisible(true); }
 
-            catch (RemoteException e) {
+            catch (Exception e) {
 
-                System.out.println("\nDeu a seguinte merda: " + e.getMessage());
-
-                System.out.println("\nEla foi causada por: " + e.getCause().toString());
+                JOptionPane.showMessageDialog(new JOptionPane(), "Erro: " + e.getMessage());
             }
         });
     }

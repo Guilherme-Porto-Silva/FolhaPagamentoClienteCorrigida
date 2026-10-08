@@ -13,9 +13,7 @@ public class Cliente {
 
     InterfacePagamento servicoPagamento;
 
-    
-
-    public void conectarRMI () {
+    public Cliente () {
 
         String serverIP = "172.16.0.19";
 

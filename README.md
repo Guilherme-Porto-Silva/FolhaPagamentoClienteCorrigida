@@ -152,7 +152,7 @@ Os serviços são buscados no registro pelos nomes `"chave"` (funcionários) e `
 1. Suba o **MySQL** e crie o banco/tabelas (seção acima).
 2. Inicie o **servidor RMI** na máquina servidora, registrando os serviços na porta `1500`.
 3. Na máquina cliente, abra o projeto no IntelliJ IDEA, adicione o **MySQL Connector/J** às bibliotecas do projeto e confirme o IP em `Cliente.java`.
-4. Execute a classe `view.ClienteJanela`.
+4. Execute a classe `view.Janela`.
 
 Para as duas máquinas se enxergarem, verifique que estão na mesma rede e que a porta `1500` está liberada no firewall do servidor.
 
