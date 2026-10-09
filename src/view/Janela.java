@@ -1,14 +1,8 @@
 package view;
 
-import interfaces.InterfaceFuncionario;
-import interfaces.InterfacePagamento;
-import modelos.Cargo;
-
+import componentes.NomeCargo;
 import java.awt.*;
-import java.rmi.NotBoundException;
 import java.rmi.RemoteException;
-import java.rmi.registry.LocateRegistry;
-import java.rmi.registry.Registry;
 import java.util.List;
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
@@ -20,7 +14,7 @@ public class Janela extends JFrame {
 
 
     // Componentes da aba Funcionários
-    
+
     private JTextField txtNomeFuncionario, txtCpfFuncionario, txtIdDepartamentoFuncionario, txtIdCargoFuncionario;
     
     private JTable tabelaFuncionarios;
@@ -40,11 +34,6 @@ public class Janela extends JFrame {
     // Componentes da Aba Cargos
 
     private JTextField txtNomeCargo, txtSalarioCargo;
-    
-    private JTextArea areaCargo;
-
-    private JComboBox cargosBox;
-
 
 
     // Componentes da Aba Pagamentos
@@ -323,20 +312,9 @@ public class Janela extends JFrame {
 
     private JComboBox criarCargosBox () {
 
-        cargosBox = new JComboBox();
+        JComboBox cargosBox = new JComboBox();
 
-        try {
-            List<Cargo> cargosList = SERVICO_CLIENTE.servicoFuncionario.listarCargos();
-
-            for (Cargo c: cargosList) cargosBox.addItem(c.getNome());
-        }
-
-        catch (RemoteException e) {
-
-            JOptionPane.showMessageDialog(this,
-
-            "Tivemos um problema na hora de listar os cargos.\n\n" + e.getMessage());
-        }
+        for (NomeCargo nome: NomeCargo.values()) cargosBox.addItem(nome.toString());
 
         return cargosBox;
     }
@@ -346,8 +324,8 @@ public class Janela extends JFrame {
     private JPanel criarPainelCargos () {
         
         var painel = criarFormularioCargos();
-        
-        areaCargo = new JTextArea();
+
+        JTextArea areaCargo = new JTextArea();
         
         painel.add(new JScrollPane(areaCargo), BorderLayout.CENTER);
 
