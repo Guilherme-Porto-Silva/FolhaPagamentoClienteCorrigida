@@ -2,6 +2,8 @@ package view;
 
 import interfaces.InterfaceFuncionario;
 import interfaces.InterfacePagamento;
+import modelos.Cargo;
+
 import java.awt.*;
 import java.rmi.NotBoundException;
 import java.rmi.RemoteException;
@@ -40,6 +42,8 @@ public class Janela extends JFrame {
     private JTextField txtNomeCargo, txtSalarioCargo;
     
     private JTextArea areaCargo;
+
+    private JComboBox cargosBox;
 
 
 
@@ -316,6 +320,28 @@ public class Janela extends JFrame {
     }
 
 
+
+    private JComboBox criarCargosBox () {
+
+        cargosBox = new JComboBox();
+
+        try {
+            List<Cargo> cargosList = SERVICO_CLIENTE.servicoFuncionario.listarCargos();
+
+            for (Cargo c: cargosList) cargosBox.addItem(c.getNome());
+        }
+
+        catch (RemoteException e) {
+
+            JOptionPane.showMessageDialog(this,
+
+            "Tivemos um problema na hora de listar os cargos.\n\n" + e.getMessage());
+        }
+
+        return cargosBox;
+    }
+
+
     
     private JPanel criarPainelCargos () {
         
@@ -324,6 +350,8 @@ public class Janela extends JFrame {
         areaCargo = new JTextArea();
         
         painel.add(new JScrollPane(areaCargo), BorderLayout.CENTER);
+
+        painel.add(criarCargosBox(), BorderLayout.NORTH);
 
         return painel;
     }

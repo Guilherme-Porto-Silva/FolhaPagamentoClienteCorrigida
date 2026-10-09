@@ -1,5 +1,7 @@
 package interfaces;
 
+import modelos.Cargo;
+
 import java.rmi.Remote;
 import java.rmi.RemoteException;
 import java.util.List;
@@ -15,4 +17,6 @@ public interface InterfaceFuncionario extends Remote {
     boolean inserirCargo(String nome, double salario, int departamentoID) throws RemoteException;
 
     boolean inserirDepartamento(String nome) throws RemoteException;
+
+    List<Cargo> listarCargos() throws RemoteException;
 }
