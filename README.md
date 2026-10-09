@@ -168,7 +168,7 @@ A classe `Pagamento` recebe a **alíquota** e o **salário** e calcula:
 ## 🔗 Repositório do Servidor
 
 O servidor desta interface gráfica pode ser encontrado no repositório:  
-👉 [[#]]([https://github.com/Guilherme-Porto-Silva/FolhaPagamentoCliente/tree/main](https://github.com/Guilherme-Porto-Silva/FolhaPagamentoServidorCorrigida))
+👉 [[#]](https://github.com/Guilherme-Porto-Silva/FolhaPagamentoServidorCorrigida)
 
 ---
 
