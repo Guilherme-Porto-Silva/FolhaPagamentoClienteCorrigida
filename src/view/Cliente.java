@@ -15,14 +15,41 @@ public class Cliente {
 
     public Cliente () {
 
-        String serverIP = "172.16.0.19";
+        try {
+            String serverIP = System.getenv("RMI_SERVER_HOST");
 
-        try{
-            Registry conexao = LocateRegistry.getRegistry(serverIP,1500);
+            String numeroServicoFuncionario = System.getenv("RMI_NUMERO_SERVICO_FUNCIONARIO");
 
-            InterfaceFuncionario servicoFuncionario = (InterfaceFuncionario) conexao.lookup("numeroServicoFuncionario");
+            String numeroServicoPagamento = System.getenv("RMI_NUMERO_SERVICO_PAGAMENTO");
 
-            InterfacePagamento servicoPagamento = (InterfacePagamento) conexao.lookup("numeroServicoPagamento");
+            var port = Integer.parseInt(System.getenv("RMI_SERVER_PORT"));
+
+            Registry conexao = LocateRegistry.getRegistry(serverIP, 1500);
+
+            servicoFuncionario = (InterfaceFuncionario) conexao.lookup(numeroServicoFuncionario);
+
+            servicoPagamento = (InterfacePagamento) conexao.lookup(numeroServicoPagamento);
+        }
+
+        catch (NullPointerException variaveisAmbienteNaoDeclaradas) {
+
+            try {
+                Registry conexao = LocateRegistry.getRegistry("172.16.0.19", 1500);
+
+                servicoFuncionario = (InterfaceFuncionario) conexao.lookup("numeroServicoFuncionario");
+
+                servicoPagamento = (InterfacePagamento) conexao.lookup("numeroServicoPagamento");
+            }
+
+            catch (RemoteException e) {
+
+                throw new RuntimeException("Erro de conexão. - " + e.getMessage());
+            }
+
+            catch (NotBoundException e) {
+
+                throw new RuntimeException("Erro na chama do serviço. - " + e.getMessage());
+            }
         }
 
         catch (RemoteException e) {

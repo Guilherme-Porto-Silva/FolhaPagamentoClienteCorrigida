@@ -121,22 +121,14 @@ public class Janela extends JFrame {
 
     private void salvarFuncionario () {
 
-        String serverIP = "172.16.0.19";
-
         try{
-            Registry conexao = LocateRegistry.getRegistry(serverIP,1500);
-
-            InterfaceFuncionario servicoFuncionario = (InterfaceFuncionario) conexao.lookup("numeroServicoFuncionario");
-
-           String nome = txtNomeFuncionario.getText();
+            String nome = txtNomeFuncionario.getText();
 
             String cpf = txtCpfFuncionario.getText();
 
-            
-
             var cargoID = Integer.parseInt(txtIdCargoFuncionario.getText());
 
-            if (servicoFuncionario.cadastrarFuncionario(nome, cpf, cargoID)) {
+            if (SERVICO_CLIENTE.servicoFuncionario.cadastrarFuncionario(nome, cpf, cargoID)) {
 
                 JOptionPane.showMessageDialog(this, "Funcionário cadastrado com sucesso.");
 
@@ -151,11 +143,6 @@ public class Janela extends JFrame {
             throw new RuntimeException("Erro de conexão. - " + e.getMessage());
         }
 
-        catch (NotBoundException e) {
-
-            throw new RuntimeException("Erro na chama do serviço. - " + e.getMessage());
-        }
-        
     }
 
 
@@ -183,16 +170,10 @@ public class Janela extends JFrame {
 
     private void carregarFuncionarios() {
 
-         String serverIP = "172.16.0.19";
-
         try{
-            Registry conexao = LocateRegistry.getRegistry(serverIP,1500);
-
-            InterfaceFuncionario servicoFuncionario = (InterfaceFuncionario) conexao.lookup("numeroServicoFuncionario");
-
             modeloTabelaFuncionarios.setRowCount(0);
 
-            List<String> lista = servicoFuncionario.listarFuncionarios();
+            List<String> lista = SERVICO_CLIENTE.servicoFuncionario.listarFuncionarios();
 
             for (String item: lista) modeloTabelaFuncionarios.addRow(new String[]{item});
         }
@@ -200,11 +181,6 @@ public class Janela extends JFrame {
         catch (RemoteException e) {
 
             throw new RuntimeException("Erro de conexão. - " + e.getMessage());
-        }
-
-        catch (NotBoundException e) {
-
-            throw new RuntimeException("Erro na chama do serviço. - " + e.getMessage());
         }
      
     }
@@ -240,14 +216,8 @@ public class Janela extends JFrame {
 
     private void inserirDepartamento () {
 
-        String serverIP = "172.16.0.19";
-
         try{
-            Registry conexao = LocateRegistry.getRegistry(serverIP,1500);
-
-            InterfaceFuncionario servicoFuncionario = (InterfaceFuncionario) conexao.lookup("numeroServicoFuncionario");
-
-            servicoFuncionario.inserirDepartamento(txtNomeDepartamento.getText());
+            SERVICO_CLIENTE.servicoFuncionario.inserirDepartamento(txtNomeDepartamento.getText());
 
             JOptionPane.showMessageDialog(this, "Departamento cadastrado.");
 
@@ -326,24 +296,18 @@ public class Janela extends JFrame {
 
         double salario = Double.parseDouble(txtSalarioCargo.getText());
 
-        String serverIP = "172.16.0.19";
-
         try{
-            Registry conexao = LocateRegistry.getRegistry(serverIP,1500);
+            if (SERVICO_CLIENTE.servicoFuncionario.inserirCargo(nome, salario, departamentoID)) {
 
-            InterfaceFuncionario servicoFuncionario = (InterfaceFuncionario) conexao.lookup("numeroServicoFuncionario");
+                JOptionPane.showMessageDialog(this, "Cargo cadastrado com sucesso.");
 
-        if (servicoFuncionario.inserirCargo(nome, salario, departamentoID)) {
+                txtNomeCargo.setText("");
 
-            JOptionPane.showMessageDialog(this, "Cargo cadastrado com sucesso.");
+                txtSalarioCargo.setText("");
+            }
 
-            txtNomeCargo.setText("");
-
-            txtSalarioCargo.setText("");
+            else JOptionPane.showMessageDialog(this, "Erro no cadastro de um cargo...");
         }
-
-        else JOptionPane.showMessageDialog(this, "Erro no cadastro de um cargo...");
-    }
 
         catch (Exception ex) {
 
@@ -403,18 +367,12 @@ public class Janela extends JFrame {
 
     private void processarPagamento () {
 
-        String serverIP = "172.16.0.19";
-
         try{
-            Registry conexao = LocateRegistry.getRegistry(serverIP,1500);
-
-            InterfacePagamento servicoPagamento = (InterfacePagamento) conexao.lookup("numeroServicoFuncionario");
-
             var funcionarioID = Integer.parseInt(txtFuncionarioIDPag.getText());
 
             String mesAno = txtMesAnoPag.getText();
 
-            servicoPagamento.calcularEfetuarPagamento(funcionarioID, mesAno);
+            SERVICO_CLIENTE.servicoPagamento.calcularEfetuarPagamento(funcionarioID, mesAno);
 
             JOptionPane.showMessageDialog(this, "Pagamento gerado com sucesso.");
 
