@@ -26,4 +26,6 @@ public class Departamento implements Serializable {
             }
         }
     }
+
+    public int getId () { return id; }
 }

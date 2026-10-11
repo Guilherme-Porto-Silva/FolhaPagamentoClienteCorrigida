@@ -74,4 +74,6 @@ public class Cargo implements Serializable {
     protected String getHorarioSaida () { return horarioSaida; }
 
     protected String getNome () { return nome; }
+
+    public int getId () { return id; }
 }

@@ -1,32 +1,66 @@
 package view;
 
+import componentes.Departamentos;
 import componentes.NomeCargo;
 import java.awt.*;
+import java.rmi.ConnectException;
+import java.rmi.ConnectIOException;
+import java.rmi.NoSuchObjectException;
 import java.rmi.RemoteException;
+import java.rmi.UnmarshalException;
+import java.text.Collator;
+import java.time.YearMonth;
+import java.time.format.DateTimeFormatter;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Locale;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.function.Consumer;
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
+import javax.swing.text.AbstractDocument;
+import modelos.Cargo;
+import modelos.Departamento;
 
 public class Janela extends JFrame {
 
+    private final Locale PT_BR = Locale.forLanguageTag("pt-BR");
+
+    private final DateTimeFormatter MES_ANO_ENVIADO = DateTimeFormatter.ofPattern("MM/yyyy");
+
+    private final DateTimeFormatter MES_ANO_EXIBIDO = DateTimeFormatter.ofPattern("MMMM/yyyy", PT_BR);
+
+    private final int FUNCIONARIO_NAO_ENCONTRADO = -1;// O que o servidor devolve em buscarIdFuncionario() quando não há um ID para dar.
+
+    private final int FUNCIONARIO_NOME_REPETIDO = -2;
+
     private final Cliente SERVICO_CLIENTE;
+    
+    private int cargaAtual = 0;// Numera as cargas da lista de funcionários: se uma resposta antiga chegar depois de uma mais nova, é descartada.
+
+    private final JLabel ROTULO_DE_ESTADO;
 
 
 
     // Componentes da aba Funcionários
 
-    private JTextField txtNomeFuncionario, txtCpfFuncionario, txtIdDepartamentoFuncionario, txtIdCargoFuncionario;
-    
-    private JTable tabelaFuncionarios;
-    
+    private JTextField txtNomeFuncionario, txtCpfFuncionario;
+
+    private SeletorOpcoes<NomeCargo> seletorCargoFuncionario;
+
+    private JButton btnSalvarFuncionario;
+
     private DefaultTableModel modeloTabelaFuncionarios;
 
 
 
     // Componentes da aba Departamentos
-    
+
     private JTextField txtNomeDepartamento;
-    
+
+    private JButton btnSalvarDepartamento;
+
     private JTextArea areaDepartamento;
 
 
@@ -35,11 +69,20 @@ public class Janela extends JFrame {
 
     private JTextField txtNomeCargo, txtSalarioCargo;
 
+    private SeletorOpcoes<Departamentos> seletorDepartamentoCargo;
+
+    private JButton btnSalvarCargo;
+
+
 
     // Componentes da Aba Pagamentos
 
-    private JTextField txtFuncionarioIDPag, txtMesAnoPag;
-    
+    private SeletorOpcoes<String> seletorFuncionarioPagamento;
+
+    private SeletorOpcoes<YearMonth> seletorMesPagamento;
+
+    private JButton btnProcessar;
+
     private JTextArea areaPagamento;
 
 
@@ -56,6 +99,26 @@ public class Janela extends JFrame {
 
         retorno.add("Pagamentos", criarPainelPagamentos());
 
+        // Ao trocar de aba: atualiza a lista de funcionários (quem foi cadastrado agora, ou por outra pessoa,
+        // já aparece) e deixa o cursor no primeiro campo, poupando um clique.
+        retorno.addChangeListener(e -> {
+
+            carregarFuncionarios();
+
+            Component primeiroCampo = switch (retorno.getSelectedIndex()) {
+
+                case 0 -> txtNomeFuncionario;
+
+                case 1 -> txtNomeDepartamento;
+
+                case 2 -> txtNomeCargo;
+
+                default -> seletorFuncionarioPagamento;
+            };
+
+            SwingUtilities.invokeLater(primeiroCampo::requestFocusInWindow);
+        });
+
         System.out.println("\nAbas do painel criadas.");
 
         return retorno;
@@ -67,45 +130,41 @@ public class Janela extends JFrame {
 
     private JPanel criarPainelFormularioCadastro () {
 
-        JPanel form = new JPanel(new GridLayout(5, 2, 5, 5));
+        JPanel form = criarFormulario("Cadastrar Funcionário");
 
-        form.setBorder(BorderFactory.createTitledBorder("Cadastrar Funcionário"));
-
-        form.add(new JLabel("Nome:"));
-
+        // Funcionário novo: o nome é dado novo, então continua sendo digitado.
         txtNomeFuncionario = new JTextField();
 
-        form.add(txtNomeFuncionario);
-
-        form.add(new JLabel("CPF:"));
-
+        // O usuário digita só os números; pontos e traço entram sozinhos.
         txtCpfFuncionario = new JTextField();
 
-        form.add(txtCpfFuncionario);
+        ((AbstractDocument) txtCpfFuncionario.getDocument()).setDocumentFilter(new FiltroCPF());
 
-        form.add(new JLabel("ID Departamento:"));
+        // cargo vem da lista (enum NomeCargo)
+        seletorCargoFuncionario = new SeletorOpcoes<>("Escolha o cargo...", "Nenhum cargo disponível", NomeCargo::toString);
 
-        txtIdDepartamentoFuncionario = new JTextField();
+        seletorCargoFuncionario.atualizar(List.of(NomeCargo.values()));
 
-        form.add(txtIdDepartamentoFuncionario);
+        linha(form, "Nome:", txtNomeFuncionario);
 
-        form.add(new JLabel("ID Cargo:"));
+        linha(form, "CPF:", txtCpfFuncionario);
 
-        txtIdCargoFuncionario = new JTextField();
+        linha(form, "Cargo:", seletorCargoFuncionario);
 
-        form.add(txtIdCargoFuncionario);
+        btnSalvarFuncionario = new JButton("Salvar Funcionário");
 
-        JButton btnSalvarFuncionario = new JButton("Salvar Funcionário");
-
-        btnSalvarFuncionario.addActionListener(e -> { salvarFuncionario(); });
-
-        form.add(btnSalvarFuncionario);
+        btnSalvarFuncionario.addActionListener(e -> salvarFuncionario());
 
         JButton btnAtualizarFuncionario = new JButton("Atualizar Lista");
 
         btnAtualizarFuncionario.addActionListener(e -> carregarFuncionarios());
 
-        form.add(btnAtualizarFuncionario);
+        botoes(form, btnSalvarFuncionario, btnAtualizarFuncionario);
+
+        // Enter passa para o campo seguinte.
+        txtNomeFuncionario.addActionListener(e -> txtCpfFuncionario.requestFocusInWindow());
+
+        txtCpfFuncionario.addActionListener(e -> seletorCargoFuncionario.requestFocusInWindow());
 
         return form;
     }
@@ -114,68 +173,94 @@ public class Janela extends JFrame {
 
     private void salvarFuncionario () {
 
-        try{
-            String nome = txtNomeFuncionario.getText();
+        String nome = txtNomeFuncionario.getText().trim();
 
-            String cpf = txtCpfFuncionario.getText();
+        String cpf = txtCpfFuncionario.getText();
 
-            var cargoID = Integer.parseInt(txtIdCargoFuncionario.getText());
+        NomeCargo cargo = seletorCargoFuncionario.getSelecionado();
 
-            if (SERVICO_CLIENTE.servicoFuncionario.cadastrarFuncionario(nome, cpf, cargoID)) {
+        if (nome.isEmpty()) { avisar("Informe o nome do funcionário.", txtNomeFuncionario); return; }
 
-                JOptionPane.showMessageDialog(this, "Funcionário cadastrado com sucesso.");
+        if (cpf.length() != FiltroCPF.TAMANHO_FORMATADO) { avisar("Informe o CPF completo (11 números).", txtCpfFuncionario); return; }
 
-                carregarFuncionarios();
+        if (cargo == null) { avisar("Escolha o cargo do funcionário.", seletorCargoFuncionario); return; }
+
+        int cargoID = idDoCargo(cargo);
+
+        if (cargoID <= 0) { mostrarErro("O cargo " + cargo + " não tem ID definido no switch de Cargo.java."); return; }
+
+        executar(btnSalvarFuncionario, () -> SERVICO_CLIENTE.servicoFuncionario.cadastrarFuncionario(nome, cpf, cargo), cadastrou -> {
+
+            if (!cadastrou) {
+
+                mostrarErro("Erro relacionado a banco de dados...");
+
+                return;
             }
 
-            else JOptionPane.showMessageDialog(this, "Erro relacionado a banco de dados...", "Erro", JOptionPane.ERROR_MESSAGE);
-        }
+            JOptionPane.showMessageDialog(this, "Funcionário cadastrado com sucesso.");
 
-        catch (RemoteException e) {
+            txtNomeFuncionario.setText("");
 
-            throw new RuntimeException("Erro de conexão. - " + e.getMessage());
-        }
+            txtCpfFuncionario.setText("");
 
+            txtNomeFuncionario.requestFocusInWindow();
+
+            carregarFuncionarios();
+        });
     }
 
 
 
-    private JPanel criarPainelFuncionarios() {
+    private JPanel criarPainelFuncionarios () {
 
         JPanel painel = new JPanel(new BorderLayout());
 
         painel.add(criarPainelFormularioCadastro(), BorderLayout.NORTH);
 
-        // Tabela de Listagem
+        modeloTabelaFuncionarios = tabelaSomenteLeitura("Funcionário");
 
-        modeloTabelaFuncionarios = new DefaultTableModel(new String[]{"ID", "Dados do Funcionário"}, 0);
-
-        tabelaFuncionarios = new JTable(modeloTabelaFuncionarios);
-
-        painel.add(new JScrollPane(tabelaFuncionarios), BorderLayout.CENTER);
-
-        carregarFuncionarios();
+        painel.add(new JScrollPane(new JTable(modeloTabelaFuncionarios)), BorderLayout.CENTER);
 
         return painel;
     }
 
 
 
-    private void carregarFuncionarios() {
+    /**
+     * Busca os nomes no servidor (sem travar a tela) e atualiza a tabela e a lista da aba Pagamentos.
+     */
+    private void carregarFuncionarios () {
 
-        try{
+        int numeroDestaCarga = ++cargaAtual;
+
+        executar(null, () -> SERVICO_CLIENTE.servicoFuncionario.listarFuncionarios(),
+
+        nomes -> {
+
+            if (numeroDestaCarga != cargaAtual) return; // já há uma carga mais nova em andamento
+
             modeloTabelaFuncionarios.setRowCount(0);
 
-            List<String> lista = SERVICO_CLIENTE.servicoFuncionario.listarFuncionarios();
+            for (String nome: nomes) modeloTabelaFuncionarios.addRow(new String[]{nome});
 
-            for (String item: lista) modeloTabelaFuncionarios.addRow(new String[]{item});
-        }
+            List<String> emOrdemAlfabetica = new ArrayList<>(nomes);
 
-        catch (RemoteException e) {
+            emOrdemAlfabetica.sort(Collator.getInstance(PT_BR));
 
-            throw new RuntimeException("Erro de conexão. - " + e.getMessage());
-        }
-     
+            seletorFuncionarioPagamento.atualizar(emOrdemAlfabetica);
+
+            avisarNaBarra("", false);
+        },
+
+        erro -> {
+
+            if (numeroDestaCarga != cargaAtual) return;
+
+            String conhecido = traduzirSeConhecido(erro);
+
+            avisarNaBarra(conhecido != null ? conhecido : "Não foi possível atualizar a lista de funcionários: " + traduzir(erro), true);
+        });
     }
 
 
@@ -194,11 +279,14 @@ public class Janela extends JFrame {
 
         form.add(txtNomeDepartamento);
 
-        JButton btnSalvarDepartamento = new JButton("Cadastrar departamento");
+        btnSalvarDepartamento = new JButton("Cadastrar departamento");
 
-        btnSalvarDepartamento.addActionListener(e -> { inserirDepartamento(); });
+        btnSalvarDepartamento.addActionListener(e -> inserirDepartamento());
 
         form.add(btnSalvarDepartamento);
+
+        // É o único campo da aba: Enter já cadastra.
+        txtNomeDepartamento.addActionListener(e -> inserirDepartamento());
 
         painel.add(form, BorderLayout.NORTH);
 
@@ -209,18 +297,30 @@ public class Janela extends JFrame {
 
     private void inserirDepartamento () {
 
-        try{
-            SERVICO_CLIENTE.servicoFuncionario.inserirDepartamento(txtNomeDepartamento.getText());
+        String nome = txtNomeDepartamento.getText().trim();
 
-            JOptionPane.showMessageDialog(this, "Departamento cadastrado.");
-
-            txtNomeDepartamento.setText("");
+        if (nome.isEmpty()) {
+            
+            avisar("Informe o nome do departamento.", txtNomeDepartamento);
+            
+            return;
         }
 
-        catch (Exception ex) {
+        executar(btnSalvarDepartamento, () ->
+                
+                SERVICO_CLIENTE.servicoFuncionario.inserirDepartamento(nome), inseriu -> {
 
-            JOptionPane.showMessageDialog(this, "Erro: " + ex.getMessage());
-        }
+                    if (!inseriu) {
+        
+                        mostrarErro("O departamento não foi cadastrado.");
+        
+                        return;
+                    }
+        
+                    JOptionPane.showMessageDialog(this, "Departamento cadastrado.");
+        
+                    txtNomeDepartamento.setText("");
+                });
     }
 
 
@@ -244,35 +344,34 @@ public class Janela extends JFrame {
 
         JPanel painel = new JPanel(new BorderLayout());
 
-        JPanel form = new JPanel(new GridLayout(3, 2, 5, 5));
-
-        form.setBorder(BorderFactory.createTitledBorder("Cadastrar cargo"));
-
-        form.add(new JLabel("Nome do cargo:"));
+        JPanel form = criarFormulario("Cadastrar cargo");
 
         txtNomeCargo = new JTextField();
 
-        form.add(txtNomeCargo);
-
-        form.add(new JLabel("Salário base (R$):"));
-
         txtSalarioCargo = new JTextField();
 
-        form.add(txtSalarioCargo);
+        txtSalarioCargo.setToolTipText("Ex.: 3660,50 ou 3.660,50");
 
-        JButton btnSalvarCargo = new JButton("Salvar cargo");
+        seletorDepartamentoCargo = new SeletorOpcoes<>("Escolha o departamento...", "Nenhum departamento disponível", Departamentos::toString);
 
-        btnSalvarCargo.addActionListener(e -> {
-            
-            try{ cadastrarCargo(); }
+        seletorDepartamentoCargo.atualizar(List.of(Departamentos.values()));
 
-            catch (Exception ex) {
+        linha(form, "Nome do cargo:", txtNomeCargo);
 
-                JOptionPane.showMessageDialog(this, "Erro no cadastro do cargo: " + ex.getMessage());
-            }
-        });
+        linha(form, "Salário base (R$):", txtSalarioCargo);
 
-        form.add(btnSalvarCargo);
+        linha(form, "Departamento:", seletorDepartamentoCargo);
+
+        btnSalvarCargo = new JButton("Salvar cargo");
+
+        btnSalvarCargo.addActionListener(e -> cadastrarCargo());
+
+        botoes(form, btnSalvarCargo);
+
+        // Enter passa para o campo seguinte.
+        txtNomeCargo.addActionListener(e -> txtSalarioCargo.requestFocusInWindow());
+
+        txtSalarioCargo.addActionListener(e -> seletorDepartamentoCargo.requestFocusInWindow());
 
         painel.add(form, BorderLayout.NORTH);
 
@@ -281,55 +380,57 @@ public class Janela extends JFrame {
 
 
 
-    private void cadastrarCargo () throws HeadlessException, RemoteException {
+    private void cadastrarCargo () {
 
-        String nome = txtNomeCargo.getText();
+        String nome = txtNomeCargo.getText().trim();
 
-        var departamentoID = Integer.parseInt(txtIdDepartamentoFuncionario.getText());
+        if (nome.isEmpty()) { avisar("Informe o nome do cargo.", txtNomeCargo); return; }
 
-        double salario = Double.parseDouble(txtSalarioCargo.getText());
+        double salario;
 
-        try{
-            if (SERVICO_CLIENTE.servicoFuncionario.inserirCargo(nome, salario, departamentoID)) {
+        try { salario = lerSalario(txtSalarioCargo.getText()); }
 
-                JOptionPane.showMessageDialog(this, "Cargo cadastrado com sucesso.");
+        catch (IllegalArgumentException ex) { avisar(ex.getMessage(), txtSalarioCargo); return; }
 
-                txtNomeCargo.setText("");
+        Departamentos departamento = seletorDepartamentoCargo.getSelecionado();
 
-                txtSalarioCargo.setText("");
+        if (departamento == null) { avisar("Escolha o departamento do cargo.", seletorDepartamentoCargo); return; }
+
+        int departamentoID = idDoDepartamento(departamento);
+
+        if (departamentoID <= 0) { mostrarErro("O departamento " + departamento + " não tem ID definido no switch de Departamento.java."); return; }
+
+        double salarioFinal = salario;
+
+        executar(btnSalvarCargo, () -> SERVICO_CLIENTE.servicoFuncionario.inserirCargo(nome, salarioFinal, departamentoID), inseriu -> {
+
+            if (!inseriu) {
+
+                mostrarErro("Erro no cadastro de um cargo...");
+
+                return;
             }
 
-            else JOptionPane.showMessageDialog(this, "Erro no cadastro de um cargo...");
-        }
+            JOptionPane.showMessageDialog(this, "Cargo cadastrado com sucesso.");
 
-        catch (Exception ex) {
+            // O departamento fica escolhido: cargos do mesmo departamento em sequência não exigem escolher de novo.
+            txtNomeCargo.setText("");
 
-            JOptionPane.showMessageDialog(this, "Erro: " + ex.getMessage());
-        }
+            txtSalarioCargo.setText("");
+
+            txtNomeCargo.requestFocusInWindow();
+        });
     }
 
 
 
-    private JComboBox criarCargosBox () {
-
-        JComboBox cargosBox = new JComboBox();
-
-        for (NomeCargo nome: NomeCargo.values()) cargosBox.addItem(nome.toString());
-
-        return cargosBox;
-    }
-
-
-    
     private JPanel criarPainelCargos () {
-        
+
         var painel = criarFormularioCargos();
 
         JTextArea areaCargo = new JTextArea();
-        
-        painel.add(new JScrollPane(areaCargo), BorderLayout.CENTER);
 
-        painel.add(criarCargosBox(), BorderLayout.NORTH);
+        painel.add(new JScrollPane(areaCargo), BorderLayout.CENTER);
 
         return painel;
     }
@@ -342,27 +443,27 @@ public class Janela extends JFrame {
 
         JPanel painel = new JPanel(new BorderLayout());
 
-        JPanel form = new JPanel(new GridLayout(3, 2, 5, 5));
+        JPanel form = criarFormulario("Gerar Folha de Pagamento");
 
-        form.setBorder(BorderFactory.createTitledBorder("Gerar Folha de Pagamento"));
+        // Os nomes vêm de listarFuncionarios(), que devolve só o nome.
+        seletorFuncionarioPagamento = new SeletorOpcoes<>("Escolha o funcionário...", "Nenhum funcionário cadastrado", nome -> nome);
 
-        form.add(new JLabel("ID do funcionário:"));
+        // Já vem com o mês atual escolhido: no uso normal, não precisa clicar aqui.
+        seletorMesPagamento = new SeletorOpcoes<>("Escolha o mês...", "", mes -> primeiraMaiuscula(MES_ANO_EXIBIDO.format(mes)));
 
-        txtFuncionarioIDPag = new JTextField();
+        seletorMesPagamento.atualizar(ultimosMeses());
 
-        form.add(txtFuncionarioIDPag);
+        seletorMesPagamento.selecionarPrimeiro();
 
-        form.add(new JLabel("Mês/Ano (Ex: 10/2026):"));
+        linha(form, "Funcionário:", seletorFuncionarioPagamento);
 
-        txtMesAnoPag = new JTextField();
+        linha(form, "Mês/Ano:", seletorMesPagamento);
 
-        form.add(txtMesAnoPag);
+        btnProcessar = new JButton("Processar Pagamento");
 
-        JButton btnProcessar = new JButton("Processar Pagamento");
+        btnProcessar.addActionListener(e -> processarPagamento());
 
-        btnProcessar.addActionListener(e -> { processarPagamento(); });
-
-        form.add(btnProcessar);
+        botoes(form, btnProcessar);
 
         painel.add(form, BorderLayout.NORTH);
 
@@ -371,37 +472,284 @@ public class Janela extends JFrame {
 
 
 
+    /**
+     * ID sai do NOME: só o servidor sabe qual ID cada nome tem.
+     * Pagar a pessoa errada é pior do que não pagar: com nome repetido, o cliente recusa.
+     */
     private void processarPagamento () {
 
-        try{
-            var funcionarioID = Integer.parseInt(txtFuncionarioIDPag.getText());
+        String nomeFuncionario = seletorFuncionarioPagamento.getSelecionado();
 
-            String mesAno = txtMesAnoPag.getText();
+        YearMonth mes = seletorMesPagamento.getSelecionado();
+
+        if (nomeFuncionario == null) { avisar("Escolha o funcionário.", seletorFuncionarioPagamento); return; }
+
+        if (mes == null) { avisar("Escolha o mês.", seletorMesPagamento); return; }
+
+        String mesAno = mes.format(MES_ANO_ENVIADO); // o servidor recebe "10/2026", como antes
+
+        executar(btnProcessar, () -> {
+
+            int funcionarioID = SERVICO_CLIENTE.servicoFuncionario.buscarIdFuncionario(nomeFuncionario);
+
+            if (funcionarioID == FUNCIONARIO_NAO_ENCONTRADO)
+
+                throw new IllegalStateException("Não existe funcionário chamado \"" + nomeFuncionario + "\". Atualize a lista e tente de novo.");
+
+            if (funcionarioID == FUNCIONARIO_NOME_REPETIDO)
+
+                throw new IllegalStateException("Há mais de um funcionário chamado \"" + nomeFuncionario + "\": não dá para saber qual deles pagar. Nada foi processado.");
 
             SERVICO_CLIENTE.servicoPagamento.calcularEfetuarPagamento(funcionarioID, mesAno);
 
+            return null;
+        },
+
+        ok -> {
+
             JOptionPane.showMessageDialog(this, "Pagamento gerado com sucesso.");
 
-            areaPagamento.append("Pagamento processado para o funcionário ID " + funcionarioID + " referente a " + mesAno + "\n");
-        }
-
-        catch (Exception ex) {
-
-            JOptionPane.showMessageDialog(this, "Erro: " + ex.getMessage());
-        }
+            areaPagamento.append("Pagamento processado para " + nomeFuncionario + " referente a " + mesAno + "\n");
+        });
     }
 
 
-    
+
     private JPanel criarPainelPagamentos () {
 
         var painel = criarFormularioPagamentos();
 
         areaPagamento = new JTextArea();
 
+        areaPagamento.setEditable(false);
+
         painel.add(new JScrollPane(areaPagamento), BorderLayout.CENTER);
 
         return painel;
+    }
+
+
+
+    private int idDoDepartamento (Departamentos departamento) { return new Departamento(departamento).getId(); }
+
+    private int idDoCargo (NomeCargo cargo) { return new Cargo(cargo).getId(); }
+
+
+
+    /**
+     * Chama o servidor sem travar a tela e, quando ele responde, executa "aoConcluir" na thread da tela.
+     * O botão (se houver) fica desligado durante a chamada: clique duplo não cadastra duas vezes.
+     */
+    private <T> void executar (JButton botao, Callable<T> chamada, Consumer<T> aoConcluir) {
+
+        executar(botao, chamada, aoConcluir, erro -> mostrarErro(traduzir(erro)));
+    }
+
+
+
+    private <T> void executar (JButton botao, Callable<T> chamada, Consumer<T> aoConcluir, Consumer<Throwable> aoFalhar) {
+
+        if (botao != null) botao.setEnabled(false);
+
+        new SwingWorker<T, Void>() {
+
+            @Override protected T doInBackground () throws Exception { return chamada.call(); }
+
+            @Override protected void done () {
+
+                if (botao != null) botao.setEnabled(true);
+
+                try { aoConcluir.accept(get()); }
+
+                catch (InterruptedException e) { Thread.currentThread().interrupt(); }
+
+                catch (ExecutionException e) { aoFalhar.accept(e.getCause()); }
+            }
+        }.execute();
+    }
+
+
+
+    private void avisar (String mensagem, Component campoComProblema) {
+
+        JOptionPane.showMessageDialog(this, mensagem, "Atenção", JOptionPane.WARNING_MESSAGE);
+
+        campoComProblema.requestFocusInWindow();
+    }
+
+
+
+    private void mostrarErro (String mensagem) {
+
+        JOptionPane.showMessageDialog(this, mensagem, "Erro", JOptionPane.ERROR_MESSAGE);
+    }
+
+
+
+    /**
+     * Mensagem discreta no rodapé, para falhas de atualização automática.
+     * Um pop-up a cada troca de aba incomodaria.
+     */
+    private void avisarNaBarra (String mensagem, boolean erro) {
+
+        ROTULO_DE_ESTADO.setForeground(erro ? new Color(0xB00020) : Color.DARK_GRAY);
+
+        ROTULO_DE_ESTADO.setText(mensagem.isEmpty() ? " " : mensagem.replace('\n', ' '));
+
+        ROTULO_DE_ESTADO.setToolTipText(mensagem.isEmpty() ? null : mensagem);
+    }
+
+
+
+    /**
+     * Como RMI costuma embrulhar o erro de verdade dentro de outro (ex.: ServerException), olhamos a cadeia toda.
+     * Devolve null se não for um erro que a gente saiba explicar melhor.
+     */ 
+    private String traduzirSeConhecido (Throwable erro) {
+
+        for (Throwable causa = erro; causa != null; causa = causa.getCause()) {
+
+            // O servidor responde "método desconhecido" quando ainda não tem o método novo.
+            if (causa instanceof UnmarshalException && String.valueOf(causa.getMessage()).contains("method hash")) {
+
+                return "Servidor desatualizado: falta o método buscarIdFuncionario (veja PATCH_SERVIDOR.md).";
+            }
+
+            if (causa instanceof ConnectException || causa instanceof ConnectIOException || causa instanceof NoSuchObjectException) {
+
+                return "Sem conexão com o servidor. Verifique se ele está no ar.";
+            }
+        }
+
+        return null;
+    }
+
+
+
+    private String traduzir (Throwable erro) {
+
+        String conhecido = traduzirSeConhecido(erro);
+
+        if (conhecido != null) return conhecido;
+
+        return "Erro inesperado: " + erro.getMessage();
+    }
+
+
+
+    /**
+     * Formulário em duas colunas.
+     * Rótulo ocupa só o que precisa e o campo fica com o resto da largura,
+     * para os textos das listas clicáveis não ficarem cortados.
+     */
+    private JPanel criarFormulario (String titulo) {
+
+        JPanel form = new JPanel(new GridBagLayout());
+
+        form.setBorder(BorderFactory.createTitledBorder(titulo));
+
+        return form;
+    }
+
+
+
+    private void linha (JPanel form, String rotulo, JComponent campo) {
+
+        GridBagConstraints doRotulo = new GridBagConstraints();
+
+        doRotulo.anchor = GridBagConstraints.WEST;
+
+        doRotulo.insets = new Insets(3, 5, 3, 5);
+
+        form.add(new JLabel(rotulo), doRotulo);
+
+        GridBagConstraints doCampo = new GridBagConstraints();
+
+        doCampo.gridwidth = GridBagConstraints.REMAINDER; // termina a linha
+
+        doCampo.weightx = 1.0;
+
+        doCampo.fill = GridBagConstraints.HORIZONTAL;
+
+        doCampo.insets = new Insets(3, 5, 3, 5);
+
+        form.add(campo, doCampo);
+    }
+
+
+
+    /**
+     * Faixa de botões, lado a lado, ocupando a largura toda do formulário.
+     */
+    private void botoes (JPanel form, JButton... botoes) {
+
+        JPanel faixa = new JPanel(new GridLayout(1, botoes.length, 5, 5));
+
+        for (JButton botao: botoes) faixa.add(botao);
+
+        GridBagConstraints c = new GridBagConstraints();
+
+        c.gridwidth = GridBagConstraints.REMAINDER;
+
+        c.fill = GridBagConstraints.HORIZONTAL;
+
+        c.insets = new Insets(3, 5, 3, 5);
+
+        form.add(faixa, c);
+    }
+
+
+
+    private DefaultTableModel tabelaSomenteLeitura (String... colunas) {
+
+        return new DefaultTableModel(colunas, 0) {
+
+            @Override public boolean isCellEditable (int linha, int coluna) { return false; }
+        };
+    }
+
+
+
+    private String primeiraMaiuscula (String texto) {
+
+        return Character.toUpperCase(texto.charAt(0)) + texto.substring(1);
+    }
+
+
+
+    private List<YearMonth> ultimosMeses () {
+
+        List<YearMonth> meses = new ArrayList<>();
+
+        YearMonth atual = YearMonth.now();
+
+        int quantosMesesAparecemNaListaDePagamentos = 24;
+
+        for (int i = 0; i < quantosMesesAparecemNaListaDePagamentos; i++) meses.add(atual.minusMonths(i));
+
+        return meses;
+    }
+
+
+
+    /**
+     * Aceita o jeito brasileiro de escrever: 3660, 3660,50 ou 3.660,50.
+     * Recusa 3660.50, de propósito.
+     * O ponto poderia ser lido como milhar e o salário sairia 100 vezes maior.
+     */
+    private double lerSalario (String texto) {
+
+        String limpo = texto.replace("R$", "").trim();
+
+        if (!limpo.matches("\\d{1,3}(\\.\\d{3})+(,\\d{1,2})?|\\d+(,\\d{1,2})?"))
+
+            throw new IllegalArgumentException("Salário inválido. Use o formato 3660,50 ou 3.660,50 ou 3660,00.");
+
+        double salario = Double.parseDouble(limpo.replace(".", "").replace(",", "."));
+
+        if (salario < 1621) throw new IllegalArgumentException("O salário precisa ser maior ou igual a R$ 1.621,00.");
+
+        return salario;
     }
 
 
@@ -418,7 +766,15 @@ public class Janela extends JFrame {
 
         setLocationRelativeTo(null);
 
-        add(abas());
+        ROTULO_DE_ESTADO = new JLabel(" ");
+
+        ROTULO_DE_ESTADO.setBorder(BorderFactory.createEmptyBorder(3, 8, 3, 8));
+
+        add(abas(), BorderLayout.CENTER);
+
+        add(ROTULO_DE_ESTADO, BorderLayout.SOUTH);
+
+        carregarFuncionarios();
     }
 
 
