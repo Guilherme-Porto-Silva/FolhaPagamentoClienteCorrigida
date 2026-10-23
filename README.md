@@ -91,34 +91,42 @@ FolhaPagamentoCliente/
 O banco esperado se chama `rmi_guigui_chan` (MySQL). As consultas do código utilizam as tabelas abaixo; um esquema compatível seria:
 
 ```sql
-CREATE DATABASE IF NOT EXISTS rmi_guigui_chan;
-USE rmi_guigui_chan;
+CREATE DATABASE FOLHA_PAGAMENTO_RMI;
+
+USE FOLHA_PAGAMENTO_RMI;
 
 CREATE TABLE Departamento (
-    id   INT AUTO_INCREMENT PRIMARY KEY,
+    id INT PRIMARY KEY AUTO_INCREMENT,
     nome VARCHAR(25) NOT NULL
 );
 
 CREATE TABLE Cargo (
-    id           INT AUTO_INCREMENT PRIMARY KEY,
-    nome         VARCHAR(100) NOT NULL,
-    salario      float NOT NULL,
-    departamento INT,
-    FOREIGN KEY (departamento) REFERENCES Departamento(id)
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    salario FLOAT DEFAULT 1675,
+    departamento VARCHAR(10) NOT NULL,
+    horario_chegada VARCHAR(5) NOT NULL,
+    horario_saida VARCHAR(5) NOT NULL
 );
 
 CREATE TABLE Funcionario (
-    id      INT AUTO_INCREMENT PRIMARY KEY,
-    nome    VARCHAR(150) NOT NULL,
-    cpf     VARCHAR(14)  NOT NULL,
-    cargoID INT,
-    FOREIGN KEY (cargoID) REFERENCES Cargo(id)
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    nome VARCHAR(25) NOT NULL,
+    cargo INT NOT NULL,
+    CONSTRAINT cargo_do_funcionario FOREIGN KEY (cargo) REFERENCES Cargo(id)
+);
+
+CREATE TABLE Pagamento (
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    salario_receptor FLOAT DEFAULT 1675,
+    aliquota_utilizada FLOAT NOT NULL,
+    imposto_cobrado FLOAT NOT NULL,
+    pagamento_pratico FLOAT NOT NULL
 );
 
 CREATE TABLE Demissoes (
-    id                  INT AUTO_INCREMENT PRIMARY KEY,
-    funcionario_demitido INT NOT NULL,
-    razao_demissao      VARCHAR(255)
+    id INT PRIMARY KEY AUTO_INCREMENT,
+    funcionario_demitido VARCHAR(25) NOT NULL,
+    razao_demissao VARCHAR(500) NOT NULL
 );
 ```
 
